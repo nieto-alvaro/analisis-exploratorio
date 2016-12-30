@@ -1,0 +1,146 @@
+---
+title: "Analisis Exploratorio"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE)
+```
+
+## 1. Introducción con el objetivo del análisis:
+El primer objetivo es clasificar a los alumnos como aprobado o suspenso dependiendo de su nota final 
+A partir de ello voy a ver si influyen en esta nueva variable y en la nota meda final, la edad y si tienen una relacion de pareja
+
+Para ello voy a usar los datos de los alumnos de matematicas, para obtener estos datos de los alumnos de portugues seguiria el mismo proceso ya que la estructura de los ficheros es la misma (Tambien se podria hacer con la combinación de ambos ficheros)
+
+
+## 2. Carga de los datos
+
+Creo un directorio y descargo en el los datos que voy a utilizar
+```{r}
+#Instalo y cargo las librerias que voy a utilizar
+libs <- c("ggplot2","knitr", "dplyr")
+  
+for (i in libs){
+  print(i)
+  if(!require(i, character.only = TRUE)) { install.packages(i, character.only = TRUE); }
+  library(i, character.only = TRUE)
+}
+
+currentDir <- getwd()
+
+if(!file.exists("./datos"))
+  dir.create("./datos")
+
+#Descargo el fichero con los datos  
+fileUrl <- "https://archive.ics.uci.edu/ml/machine-learning-databases/00320/student.zip"
+download.file(fileUrl,destfile="./datos/student.zip")
+unzip("./datos/student.zip", exdir="./datos")
+list.files("./datos")
+rm(fileUrl)
+
+fechaDescarga <- date()
+
+```
+Creo el dataset
+```{r}
+
+student.mat <- read.csv2("./datos/student-mat.csv",row.names=NULL, sep=";", header=TRUE)
+
+```
+
+## 3. Análisis descriptivo
+
+Analizamos el nombre de cada una de las variables y las pasamos a minusculas para que sean mas faciles de manejar
+
+```{r}
+names(student.mat) <- tolower(names(student.mat))
+```
+
+Muestro las primeras lineas del dataset para ver que datos tengo
+
+```{r}
+head(student.mat[,1:5])
+```
+
+
+Muestro las dimensiones del dataset y un resumen de los datos que hay en el
+```{r}
+dim(student.mat)
+summary(student.mat)
+str(student.mat)
+```
+
+## 4. Análisis exploratorio
+
+Para hacer analisis exploratorio solo voy a coger las variables age, romantic y g3 que son las que necesitare para este analisis
+
+```{r}
+student.mat.exploratorio <- student.mat %>% select(age, romantic, g3)
+
+#añado una variable de aprobado o suspenso dependendo del valor de g3
+aprobados <- ifelse(student.mat.exploratorio$g3>=10,'aprobado','suspenso')
+student.mat.exploratorio <- data.frame(student.mat.exploratorio,aprobados)
+summary(student.mat.exploratorio)
+
+#Hago un gráfico que nos saca la relación que hay entre los aprobados y los suspensos dependiendo de si tienen o no una relación sentimental
+ggplot(student.mat.exploratorio, aes(x = romantic)) + geom_bar(colour="black", fill="blue", alpha=.5, stat="count") +
+facet_grid(aprobados ~ .) +
+ggtitle ("Relación gráfica entre aprobar o no matemáticas y la relacion sentimental") +
+theme(plot.title=element_text(vjust = +1.5, size = 10))
+
+#Hago lo mismo con la edad
+ggplot(student.mat.exploratorio, aes(x = age)) + geom_bar(colour="black", fill="blue", alpha=.5, stat="count") +
+facet_grid(aprobados ~ .) +
+ggtitle ("Relación gráfica entre aprobar o no matemáticas y la edad") +
+theme(plot.title=element_text(vjust = +1.5, size = 10))
+
+#Comparo la media de las notas finales
+aggregate(student.mat.exploratorio["g3"], student.mat.exploratorio["romantic"], mean)
+aggregate(student.mat.exploratorio["g3"], student.mat.exploratorio["age"], mean)
+
+#Hago un gráfico que nos saca la relación que hay entre las notas medias dependiendo de si tienen o no una relación sentimental
+boxplot(g3~romantic,data=student.mat.exploratorio, main="Distribucion de la nota final", col=(c("gold","darkgreen")),
+  	xlab="Relacion sentimental", ylab="Nota Final")
+
+#Hago lo mismo con la edad
+boxplot(g3~age,data=student.mat.exploratorio, main="Distribucion de la nota final", col=(c("gold","darkgreen")),
+  	xlab="Edad", ylab="Nota Final")
+
+#Convierto la variable aprobados a numerica
+student.mat.exploratorio$aprobados <- as.numeric(student.mat.exploratorio$aprobados)
+
+#Hasta aqui he visto graficos que me relacionan la nota final con una de las otras variables, ahora voy a ver como lo hace con las dos a la vez
+#Calculo la nota media por edad y relacion sentimental
+x <- tapply(student.mat.exploratorio$g3, list(student.mat.exploratorio$age, student.mat.exploratorio$romantic), mean, na.rm=TRUE)
+
+barplot(x,
+        legend=TRUE,        
+        beside=TRUE,
+        main="Nota media segun edad y situacion sentimental",
+        ylab="Nota media",
+        xlab="Relación sentimental",
+        col=heat.colors(3,alpha=.6),
+        xpd=F)
+
+#Este grafico de lineas me muestra gráfico las interacciones entre los dos factores y la nota final
+with(student.mat.exploratorio, interaction.plot(age, romantic, g3))
+
+```
+
+## 5. Conclusión
+
+Observando las tablas y los graficos que he realizado llego a siguiente conclusion.
+
+Con las variables que yo he seleccionado no hay una relacion clara con los aprobados ni con la nota media.
+
+Al comparar la variable romantic con los aprobados y los suspensos veo que el numero de aprobados sin relacion sentimental si es mayor que los que no tienen relacion, pero en el caso de los suspensos es muy similar.
+La nota media final es similar entre ambos casos, aunque un poco mayor en el caso de los que no tienen relacón sentimental
+
+Al usar la variable age veo que las notas medias van bajando segun aumenta la edad, exceptuando el caso de la edad igual a 20 que aumenta significativamente. En el caso de aprobados y suspensos no hay una relación clara.
+
+Al combinar ambas variables vemos que la media de la nota final sube y baja sin tener una tendancia clara.
+
+Habria que añadir alguna variable mas al analisis o seleccionar otras variables ya que con estas no se puede sacar ninguna conclusion clara.
